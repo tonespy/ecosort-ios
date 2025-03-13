@@ -1,0 +1,4 @@
+#AppStore: Release, Production, Development
+git_url(ENV["MATCH_GIT_URL"])
+app_identifier("com.swapkoin.ecosort,com.swapkoin.ecosort.NotificationServiceExtension")
+team_id ENV["MATCH_TEAM_ID"]

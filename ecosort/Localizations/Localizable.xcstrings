@@ -1,0 +1,37 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Easily identify waste categories with AI and contribute to a cleaner, greener world." : {
+      "extractionState" : "manual"
+    },
+    "Get started" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aan de slag"
+          }
+        }
+      }
+    },
+    "On-Device AI Model is downloading in the background. Cloud AI will handle predictions until the download is complete." : {
+      "extractionState" : "manual"
+    },
+    "On-Device AI v%@ is downloading in the background. Cloud AI will handle predictions until the download is complete.\"" : {
+      "extractionState" : "manual"
+    },
+    "onboarding_info_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sort smarter,\nsave the planet"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

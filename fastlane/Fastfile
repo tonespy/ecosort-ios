@@ -1,0 +1,142 @@
+import("fastfiles/Certificates.fastfile")
+
+source_root_dir = Pathname.pwd.join('..')
+@path_to_output = source_root_dir.join('output')
+@path_to_log = source_root_dir.join('logs')
+
+@keychain_name = "keychain-ecosort"
+
+desc "Build a debug version of the app"
+lane :debug_build do |options|
+  if is_ci_environment
+    create_local_keychain
+    install_dev_certs(keychain: @keychain_name, password: ENV['KEYCHAIN_PASSWORD'])
+  else
+    install_dev_certs
+  end
+  bump_build_number(configuration: 'Debug')
+  build_debug
+end
+
+desc "App Store build"
+private_lane :build_production do
+  silent = ENV['SILENT_BUILD'] ? ENV['SILENT_BUILD'] : true
+
+  gym(
+    silent: silent,
+    supress_xcode_output: silent,
+    workspace: "#{source_root_dir}/ecosort.xcworkspace",
+    scheme: 'ecosort',
+    configuration: 'Release',
+    output_name: 'ecosort-release',
+    output_directory: @path_to_output,
+    archive_path: "#{source_root_dir}/ecosort.xcarchive",
+    export_method: 'app-store',
+    include_symbols: true,
+    buildlog_path: @path_to_log,
+  )
+end
+
+desc "Debug build"
+private_lane :build_debug do
+  silent = ENV['SILENT_BUILD'] ? ENV['SILENT_BUILD'] : true
+
+  gym(
+    silent: silent,
+    supress_xcode_output: silent,
+    workspace: "#{source_root_dir}/ecosort.xcworkspace",
+    scheme: 'ecosort',
+    configuration: 'Debug',
+    output_name: 'ecosort-debug',
+    output_directory: @path_to_output,
+    archive_path: "#{source_root_dir}/ecosort.xcarchive",
+    export_method: 'development',
+    include_symbols: true,
+    buildlog_path: @path_to_log,
+  )
+end
+
+desc "Bump build number"
+lane :bump_build_number do |options|
+  date = `date +%Y%m%d%H%M`.strip
+  increment_build_number_in_xcodeproj(
+    build_number: date,
+    target: 'ecosort',
+    xcodeproj: "#{source_root_dir}/ecosort.xcodeproj",
+    build_configuration_name: options[:configuration],
+  )
+  increment_build_number_in_xcodeproj(
+    build_number: date,
+    target: 'NotificationServiceExtension',
+    xcodeproj: "#{source_root_dir}/ecosort.xcodeproj",
+    build_configuration_name: options[:configuration],
+  )
+end
+
+desc "Get project build number"
+lane :get_proj_builder_number do |options|
+  UI.message("Getting project build number -- #{source_root_dir}/ecosort.xcodeproj")
+  build_number = get_build_number_from_xcodeproj(
+    xcodeproj: "#{source_root_dir}/ecosort.xcodeproj",
+    target: 'ecosort',
+    build_configuration_name: options[:configuration],
+  )
+  UI.message("Current Build Number: #{build_number}")
+  build_number
+end
+
+desc "Upload build to TestFlight"
+lane :deploy_to_testflight do
+  key_file = ENV["APPLE_AUTH_FILE"]
+  issuer_id = ENV["APPLE_ISSUER_ID"]
+  key_id = ENV["APPLE_KEY_ID"]
+
+  if key_file.empty? || issuer_id.empty? || key_id.empty?
+    UI.user_error!("Please provide Apple auth file, issuer id and key id")
+    raise """
+    The following environment variables are required:
+    - APPLE_AUTH_FILE
+    - APPLE_ISSUER_ID
+    - APPLE_KEY_ID
+    """
+  end
+
+  api_key = app_store_connect_api_key(
+    key_id: key_id,
+    issuer_id: issuer_id,
+    key_filepath: key_file,
+    duration: 1200, # optional (maximum 1200)
+  )
+
+  pilot(
+    api_key: api_key,
+    app_identifier: "com.swapkoin.ecosort",
+    ipa: "#{@path_to_output}/ecosort-release.ipa",
+    skip_submission: true,
+    skip_waiting_for_build_processing: true,
+    notify_external_testers: false,
+  )
+end
+
+desc "Checks if it is a CI environemnt"
+private_lane :is_ci_environment do
+  # Check if environment is a CI environment
+  if ENV['CI']
+    true
+  else
+    false
+  end
+end
+
+desc "Create local keychain in CI environment"
+private_lane :create_local_keychain do
+  # Create a local keychain
+  create_keychain(
+    name: @keychain_name,
+    password: ENV['KEYCHAIN_PASSWORD'],
+    default_keychain: true,
+    unlock: true,
+    timeout: 3600,
+    lock_when_sleeps: true
+  )
+end

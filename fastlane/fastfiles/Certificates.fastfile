@@ -1,0 +1,54 @@
+# Certificates
+# This file contains the fastlane.tools configuration for the certificates
+
+desc "Install development certificates"
+lane :install_dev_certs do |options|
+  keychain_name = options[:keychain] || "login"
+  team_id = options[:team_id]
+  git_url = options[:git_url]
+
+  if team_id.nil?
+    UI.user_error!("You must provide a team_id")
+  end
+
+  if git_url.nil?
+    UI.user_error!("You must provide a git_url")
+  end
+  match(
+    keychain_name: keychain_name,
+    keychain_password: options[:password],
+    type: "development",
+    git_url: git_url,
+    app_identifier: [
+      "com.swapkoin.ecosort",
+      "com.swapkoin.ecosort.notification-service"
+    ],
+    team_id: team_id,
+  )
+end
+
+desc "Install production certificates"
+lane :install_production_certs do |options|
+  keychain_name = options[:keychain_name] || "login"
+  team_id = options[:team_id]
+  git_url = options[:git_url]
+
+  if team_id.nil?
+    UI.user_error!("You must provide a team_id")
+  end
+
+  if git_url.nil?
+    UI.user_error!("You must provide a git_url")
+  end
+  match(
+    keychain_name: keychain_name,
+    keychain_password: options[:password],
+    type: "appstore",
+    git_url: git_url,
+    app_identifier: [
+      "com.swapkoin.ecosort",
+      "com.swapkoin.ecosort.notification-service"
+    ],
+    team_id: team_id,
+  )
+end
