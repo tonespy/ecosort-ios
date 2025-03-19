@@ -7,16 +7,23 @@
 
 import Foundation
 
-public struct PredictionConfig: Codable, DecodableType, Sendable, Equatable {
+public struct PredictionConfig: RequestModelConforms {
   public let versions: [PredictVersionModelVersion]
   public let classes: [PredictionClasses]
+  public let groups: [ClassGroupConfig]
 
   public static func == (lhs: PredictionConfig, rhs: PredictionConfig) -> Bool {
-    return lhs.versions == rhs.versions && lhs.classes == rhs.classes
+    return lhs.versions == rhs.versions && lhs.classes == rhs.classes && lhs.groups == rhs.groups
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case versions
+    case classes
+    case groups
   }
 }
 
-public struct PredictVersionModelVersion: Codable, DecodableType, Sendable, Equatable {
+public struct PredictVersionModelVersion: RequestModelConforms {
   public let version: String
   public let date: String
   public let url: String
@@ -62,7 +69,7 @@ public struct PredictVersionModelVersion: Codable, DecodableType, Sendable, Equa
   }
 }
 
-public struct PredictionClasses: Codable, DecodableType, Sendable, Equatable {
+public struct PredictionClasses: RequestModelConforms {
   public let index: Int
   public let name: String
   public let readableName: String
@@ -77,5 +84,12 @@ public struct PredictionClasses: Codable, DecodableType, Sendable, Equatable {
     case name
     case readableName = "readable_name"
     case description
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(index)
+    hasher.combine(name)
+    hasher.combine(readableName)
+    hasher.combine(description)
   }
 }

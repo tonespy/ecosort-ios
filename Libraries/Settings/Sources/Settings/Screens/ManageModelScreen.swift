@@ -31,6 +31,9 @@ struct ManageModelScreen: View {
           dismiss()
         } label: {
           Text("Save")
+            .font(Font.EcoSort.title3)
+            .foregroundStyle(Color.EcoSort.Text.text5)
+            .lineSpacing(AppPadding.custom(11).value)
         }
         .disabled(!viewModel.canUserSave)
       }

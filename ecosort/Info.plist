@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>LSSupportsOpeningDocumentsInPlace</key>
-  <true/>
 	<key>API_REQ_KEY</key>
 	<string>$(API_REQ_KEY)</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
@@ -21,6 +19,21 @@
 	<array>
 		<string>fetch</string>
 		<string>processing</string>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Item sorting drag and drop</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.ecosort.item_drag_and_drop</string>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
 	</array>
 </dict>
 </plist>
