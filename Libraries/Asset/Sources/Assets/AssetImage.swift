@@ -19,5 +19,9 @@ public extension Image.EcoSort {
 
   struct Home {
     public static let scanIcon = Image("icon.home.scan", bundle: .sharedResources)
+    public static let emptyRecordIcon = Image(
+      "icon.home.emptypage",
+      bundle: .sharedResources
+    )
   }
 }

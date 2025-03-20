@@ -10,6 +10,31 @@ import Factory
 import Foundation
 import Platform
 
+enum FilePickerFlow: String, Identifiable {
+  var id: Self { self }
+  case image
+  case video
+  case mediaAlbum
+  case documentPicker
+
+  case photoInAlbum
+  case photoInDocument
+  case videoInAlbum
+  case videoInDocument
+
+  case unknown
+
+  var title: String {
+    switch self {
+    case .image: "Image"
+    case .video: "Video"
+    case .mediaAlbum: "Media Album"
+    case .documentPicker: "Document Picker"
+    default: ""
+    }
+  }
+}
+
 public final class HomeViewModel: ObservableObject {
   private let downloadManager: DownloadManager
   private let predictionService: PredictionAPIService
@@ -19,6 +44,11 @@ public final class HomeViewModel: ObservableObject {
   @Published var downloadedModelVersion: String = ""
   @Published var progress: Double = 0
   @Published var isMenueOpen: Bool = false
+
+  @Published var showMediaPicker: Bool = false
+  @Published var finalMediaOption: FilePickerFlow = .unknown
+  @Published var showMediaAlbumOrDocumentPicker: Bool = false
+  @Published var mediaResult: EcoAlbumPickerResult?
 
   private var subscriptions = Set<AnyCancellable>()
 
@@ -34,7 +64,6 @@ public final class HomeViewModel: ObservableObject {
     }.store(in: &subscriptions)
 
     downloadManager.$progress.sink { [weak self] downloadProgress in
-//      print("Home Download Progress: \(downloadProgress)")
       self?.progress = downloadProgress
     }.store(in: &subscriptions)
 
@@ -53,6 +82,25 @@ public final class HomeViewModel: ObservableObject {
       self?.isDownloadCompleted = false
       print("Download failed: \(errorInfo)")
     }
+
+    $finalMediaOption
+      .dropFirst()
+      .sink { [weak self] selectedOption in
+        // Process flow
+        print("Selected option: \(selectedOption)")
+        self?.showMediaPicker = false
+        self?.showMediaAlbumOrDocumentPicker = true
+      }
+      .store(in: &subscriptions)
+
+    $mediaResult
+      .dropFirst()
+      .sink { result in
+        self.showMediaAlbumOrDocumentPicker = false
+        guard let result else { return }
+        print("Results: ", result)
+      }
+      .store(in: &subscriptions)
   }
 
   private func getDefaultModel() throws -> URL {

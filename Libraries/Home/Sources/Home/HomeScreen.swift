@@ -8,6 +8,7 @@
 import Assets
 import SwiftUI
 import PhotosUI
+import Platform
 
 public struct HomeScreen: View {
   @EnvironmentObject var homeState: HomeState
@@ -18,10 +19,17 @@ public struct HomeScreen: View {
 
   public var body: some View {
     ZStack {
-      Image(systemName: "globe")
-        .imageScale(.large)
-        .foregroundStyle(.tint)
-
+      Color.EcoSort.Base.background
+      List {
+        //
+      }.overlay {
+        ContentUnavailableView {
+          EmptyHomeView()
+            .environmentObject(viewModel)
+        }
+      }
+//      EmptyHomeView()
+      /*
       PhotosPicker(
         selection: $selectedImage,
         matching: .images,
@@ -44,15 +52,34 @@ public struct HomeScreen: View {
           }
         }
       }
+      */
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Color.EcoSort.Base.background)
-    .padding(AppPadding.medium.value)
     .overlay(toggleView, alignment: .bottomTrailing)
     .snackbar(
       show: $viewModel.isDownloadCompleted,
       message: "Model\(viewModel.downloadedModelVersion) downloaded successfully!"
     )
+    .sheet(isPresented: $viewModel.showMediaPicker) {
+      FilePickerFlowView()
+        .environmentObject(viewModel)
+        .presentationDetents([.fraction(0.25)])
+    }
+    .sheet(isPresented: $viewModel.showMediaAlbumOrDocumentPicker) {
+      switch viewModel.finalMediaOption {
+      case .photoInAlbum:
+        EcoAlbumMediaPicker(result: $viewModel.mediaResult, type: .images)
+      case .photoInDocument:
+        EcoDocumentMediaPicker(result: $viewModel.mediaResult, type: .images)
+      case .videoInAlbum:
+        EcoAlbumMediaPicker(result: $viewModel.mediaResult, type: .video)
+      case .videoInDocument:
+        EcoDocumentMediaPicker(result: $viewModel.mediaResult, type: .video)
+      default:
+        EmptyView()
+      }
+    }
   }
 
   private var toggleView: some View {
@@ -64,6 +91,7 @@ public struct HomeScreen: View {
 
           Image.EcoSort.Home.scanIcon
             .resizable()
+            .foregroundColor(Color.EcoSort.Content.primary)
             .frame(width: 25, height: 25)
         }
         .frame(width: 50, height: 50)
@@ -92,6 +120,10 @@ public struct HomeScreen: View {
             .foregroundStyle(Color.EcoSort.Text.text4)
             .padding(AppPadding.small.value)
             .background(Capsule().fill(Color.EcoSort.Brand.greenInverse))
+            .onTapGesture {
+              viewModel.showMediaPicker.toggle()
+              isMenuOpen.toggle()
+            }
         }
       }
       .frame(minWidth: 200, maxWidth: .infinity)
