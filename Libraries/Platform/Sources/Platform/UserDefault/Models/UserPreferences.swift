@@ -7,7 +7,7 @@
 
 public struct UserConfigedGroups: Codable, Sendable {
   public let config: ClassGroupConfig
-  public let isDefault: Bool
+  public var isDefault: Bool
 
   public init(config: ClassGroupConfig, isDefault: Bool) {
     self.config = config

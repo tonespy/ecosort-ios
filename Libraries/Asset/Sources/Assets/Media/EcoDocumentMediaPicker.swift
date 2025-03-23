@@ -29,11 +29,11 @@ public struct EcoDocumentMediaPicker: UIViewControllerRepresentable {
       case .images:
         return [UTType.image]
       case .video:
-        return [UTType.movie]
+        return [UTType.movie, UTType.video]
       }
     }()
 
-    let picker = UIDocumentPickerViewController(forOpeningContentTypes: allowedTypes, asCopy: true)
+    let picker = UIDocumentPickerViewController(forOpeningContentTypes: allowedTypes)
     // For images: allow multiple selection; for video: only one selection.
     switch type {
     case .images:
@@ -42,6 +42,8 @@ public struct EcoDocumentMediaPicker: UIViewControllerRepresentable {
       picker.allowsMultipleSelection = false
     }
     picker.delegate = context.coordinator
+    picker.modalPresentationStyle = .formSheet
+    picker.shouldShowFileExtensions = true
     return picker
   }
 
@@ -57,17 +59,24 @@ public struct EcoDocumentMediaPicker: UIViewControllerRepresentable {
     }
 
     public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+      print("documentPicker didPickDocumentsAt called with urls: \(urls)")
+      print("Picker type: \(parent.type)")
       switch parent.type {
       case .images:
-        var newImages: [UIImage] = []
+        print("Processing images...")
+        var newImages: [VideoFrameResult] = []
         let dispatchGroup = DispatchGroup()
         for url in urls {
           dispatchGroup.enter()
           // Load image data from each URL.
           DispatchQueue.global(qos: .userInitiated).async {
             if let data = try? Data(contentsOf: url),
-               let image = UIImage(data: data) {
-              newImages.append(image)
+               let image = UIImage(data: data), let resized = image.preprocessImage(
+                CGSize(width: 256, height: 256)
+               ) {
+              newImages.append(
+                VideoFrameResult(data: data, resizedData: resized, image: image)
+              )
             }
             dispatchGroup.leave()
           }
@@ -76,9 +85,33 @@ public struct EcoDocumentMediaPicker: UIViewControllerRepresentable {
           self.parent.result = .images(newImages)
         }
       case .video:
+        print("Processing videos...")
         if let url = urls.first {
-          DispatchQueue.main.async {
-            self.parent.result = .video(url)
+          do {
+            let moveItem = try url.saveVideoToAppDocument()
+            print("Moved Item Information: ", moveItem)
+            Task.detached {
+              await MainActor.run {
+                self.parent.result = .processing("Extracting frames from video...")
+              }
+
+              print("Moved File: ", moveItem)
+
+              let extractedFrames = await moveItem.extractUniqueFramesFromVideo()
+
+              await MainActor.run {
+                if extractedFrames.isEmpty {
+                  self.parent.result = .failed("Unable to extract frames from video.")
+                } else {
+                  self.parent.result = .video(moveItem, extractedFrames)
+                }
+              }
+            }
+          } catch {
+            print("Error saving video: \(error)")
+            DispatchQueue.main.async {
+              self.parent.result = .failed("Unable to access video file.")
+            }
           }
         }
       }

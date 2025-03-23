@@ -84,8 +84,6 @@ public final class ManageCategoriesViewModel: ObservableObject {
     existingUserSavedGroups = userConfigedGroups
 
     let userSavedGroupsPicker = userConfigedGroups.map { userConfig in
-      let isDefault = userConfig.isDefault
-
       let grouping = userConfig.config.groupConfig.map { groupConfig in
         let sectionItems = groupConfig.classes.map(\.self).map(CategoryItem.init)
         return CategorySection(name: groupConfig.name, items: sectionItems)
@@ -94,7 +92,7 @@ public final class ManageCategoriesViewModel: ObservableObject {
       return PickerItem(
         label: userConfig.config.name,
         content: grouping,
-        isDefault: isDefault,
+        isDefault: userConfig.isDefault,
         canEdit: true
       )
     }
@@ -222,6 +220,11 @@ public final class ManageCategoriesViewModel: ObservableObject {
       isDefault: currentSelectedItem.isDefault
     )
 
+    if currentSelectedItem.isDefault {
+      existingUserSavedGroups = existingUserSavedGroups
+        .map { UserConfigedGroups(config: $0.config, isDefault: false) }
+    }
+
     if let (index, _) = existingUserSavedGroups.enumerated().first(
       where: { $0.element.config.name == userSaved
         .config.name }) {
@@ -239,6 +242,38 @@ public final class ManageCategoriesViewModel: ObservableObject {
   }
 
   private func toggleFavorite(_ isFavorite: Bool) {
+    guard let currentSelectedItem, var userPreference = UserDefaults.standard.userPreference else { return }
+
+    if isFavorite && !currentSelectedItem.isDefault {
+      existingUserSavedGroups = existingUserSavedGroups
+        .map {
+          UserConfigedGroups(
+            config: $0.config,
+            isDefault: $0.config.name == currentSelectedItem
+              .label
+          )
+        }
+    } else {
+      // Show an error
+    }
+
+    userPreference.savedGroups = existingUserSavedGroups
+    UserDefaults.standard.userPreference = userPreference
+
+    fetchCategories()
+  }
+
+  private func deleteCurrentSelectedItem() {
+    guard let currentSelectedItem, var userPreference = UserDefaults.standard.userPreference, !currentSelectedItem.isDefault else {
+      // Show error that you can't delete an only group
+      return
+    }
+
+    existingUserSavedGroups = existingUserSavedGroups.filter { $0.config.name != currentSelectedItem.label }
+    userPreference.savedGroups = existingUserSavedGroups
+    UserDefaults.standard.userPreference = userPreference
+    
+    fetchCategories()
   }
 
   func handleToolbarAction(_ action: ToolbarAction) {
@@ -255,8 +290,8 @@ public final class ManageCategoriesViewModel: ObservableObject {
       toggleFavorite(true)
     case .unFavorite:
       toggleFavorite(false)
-    default:
-      break
+    case .delete:
+      deleteCurrentSelectedItem()
     }
   }
 

@@ -8,24 +8,30 @@
 import Foundation
 import SwiftData
 
-enum PredictionState: String, Codable {
+public enum SessionPredictionState: String, Codable {
   case pending
   case inProgress
   case done
 }
 
-enum PredictionMediaType: String, Codable {
+public enum SessionPredictionMediaType: String, Codable {
   case image
   case video
 }
 
+public enum SessionPredictionType: String, Codable {
+  case onDeviceAI
+  case cloudAI
+}
+
 @Model
-final class PredictionSessionModel {
-  @Attribute(.unique) var id: UUID
+public final class PredictionSessionModel {
+  @Attribute(.unique) public var id: UUID
   var date: Date
-  var predictionState: PredictionState
+  var predictionState: SessionPredictionState
   var numberOfImages: Int
-  var mediaType: PredictionMediaType
+  var mediaType: SessionPredictionMediaType
+  var predictionType: SessionPredictionType
   var finalAccuracy: Double?
   var preliminaryAccuracy: Double?
   var reviewCompletion: Double?
@@ -38,12 +44,13 @@ final class PredictionSessionModel {
   @Relationship(deleteRule: .cascade, inverse: \PredictionSessionMedia.session)
   var images: [PredictionSessionMedia]
 
-  init(
+  public init(
     id: UUID,
     date: Date,
-    predictionState: PredictionState,
+    predictionState: SessionPredictionState,
     numberOfImages: Int,
-    mediaType: PredictionMediaType,
+    mediaType: SessionPredictionMediaType,
+    predictionType: SessionPredictionType,
     finalAccuracy: Double? = nil,
     preliminaryAccuracy: Double? = nil,
     reviewCompletion: Double? = nil,
@@ -57,6 +64,7 @@ final class PredictionSessionModel {
     self.predictionState = predictionState
     self.numberOfImages = numberOfImages
     self.mediaType = mediaType
+    self.predictionType = predictionType
     self.finalAccuracy = finalAccuracy
     self.preliminaryAccuracy = preliminaryAccuracy
     self.reviewCompletion = reviewCompletion

@@ -10,9 +10,31 @@ import PhotosUI
 import UniformTypeIdentifiers
 
 public enum EcoAlbumPickerResult {
-  case images([UIImage])
-  case video(URL)
+  case images([VideoFrameResult])
+  case video(URL, [VideoFrameResult])
+  case processing(String)
+  case failed(String)
   case cancelled
+
+  public var images: [VideoFrameResult]? {
+    switch self {
+    case .images(let images):
+      return images
+    case .video(_, let frames):
+      return frames
+    case .processing, .failed, .cancelled:
+      return []
+    }
+  }
+
+  public var url: URL? {
+    switch self {
+    case .video(let url, _):
+      return url
+    default:
+      return nil
+    }
+  }
 }
 
 public enum EcoAlbumPickerType {
@@ -66,16 +88,24 @@ public struct EcoAlbumMediaPicker: UIViewControllerRepresentable {
       _ results: [PHPickerResult],
       dispatchGroup: DispatchGroup
     ) {
-      var newImages: [UIImage] = []
+      var newImages: [VideoFrameResult] = []
 
       for result in results {
         let provider = result.itemProvider
         if provider.canLoadObject(ofClass: UIImage.self) {
           dispatchGroup.enter()
-          provider.loadObject(ofClass: UIImage.self) { image, error in
+          provider.loadObject(ofClass: UIImage.self) {
+ image,
+ error in
             defer { dispatchGroup.leave() }
-            if let image = image as? UIImage {
-              newImages.append(image)
+            if let image = image as? UIImage,
+               let data = image.jpegData(compressionQuality: 0.8),
+               let resized = image.preprocessImage(
+                CGSize(width: 256, height: 256)
+               ) {
+              newImages.append(
+                VideoFrameResult(data: data, resizedData: resized, image: image)
+              )
             }
           }
         }
@@ -93,8 +123,27 @@ public struct EcoAlbumMediaPicker: UIViewControllerRepresentable {
       if provider.hasItemConformingToTypeIdentifier(videoUTI) {
         provider.loadFileRepresentation(forTypeIdentifier: videoUTI) { url, error in
           if let url = url {
-            DispatchQueue.main.async {
-              self.parent.result = .video(url)
+            do {
+              let moveItem = try url.saveVideoToAppDocument()
+              Task.detached {
+                await MainActor.run {
+                  self.parent.result = .processing("Extracting frames from video...")
+                }
+                let extractedFrames = await moveItem.extractFramesFromVideo()
+
+                await MainActor.run {
+                  if extractedFrames.isEmpty {
+                    self.parent.result = .failed("Error extracting frames from video")
+                  } else {
+                    self.parent.result = .video(moveItem, extractedFrames)
+                  }
+                }
+              }
+            } catch {
+              print("Error saving video: \(error)")
+              DispatchQueue.main.async {
+                self.parent.result = .failed("Unable to access video file.")
+              }
             }
           }
         }

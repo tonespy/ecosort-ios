@@ -9,29 +9,32 @@ import Foundation
 import SwiftData
 
 @Model
-final class PredictionSessionGroup {
-  @Attribute(.unique) var id: UUID
+public final class PredictionSessionGroup {
+  @Attribute(.unique) public var id: UUID
   var name: String
+  var localGroupName: String
   @Relationship(deleteRule: .cascade, inverse: \SessionGroupClass.group)
   var classes = [SessionGroupClass]()
   var session: PredictionSessionModel?
 
-  init(
+  public init(
     id: UUID,
     name: String,
+    localGroupName: String,
     classes: [SessionGroupClass] = [SessionGroupClass](),
     session: PredictionSessionModel? = nil
   ) {
     self.id = id
     self.name = name
+    self.localGroupName = localGroupName
     self.classes = classes
     self.session = session
   }
 }
 
 @Model
-final class SessionGroupClass {
-  @Attribute(.unique) var id: UUID
+public final class SessionGroupClass {
+  @Attribute(.unique) public var id: UUID
   var name: String
   var displayName: String
   var classDescription: String

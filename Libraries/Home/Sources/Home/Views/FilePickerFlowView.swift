@@ -61,7 +61,7 @@ struct FilePickerSeconSelection: View {
               let destination = flow == FilePickerFlow.mediaAlbum ? FilePickerFlow.photoInAlbum : FilePickerFlow.photoInDocument
               homeViewModel.finalMediaOption = destination
             } else {
-              let destination = flow == FilePickerFlow.documentPicker ? FilePickerFlow.videoInAlbum : FilePickerFlow.videoInDocument
+              let destination = flow == FilePickerFlow.mediaAlbum ? FilePickerFlow.videoInAlbum : FilePickerFlow.videoInDocument
               homeViewModel.finalMediaOption = destination
             }
           }

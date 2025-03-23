@@ -18,6 +18,25 @@ public struct PredictionResult {
   }
 }
 
+public enum TFLiteModelError: Error {
+  case invalidClass
+  case unknwownError(Error)
+
+  public var errorInformation: String {
+    switch self {
+    case .invalidClass:
+      return "Invalid classification provided."
+    case .unknwownError(let error):
+      return "\(error)"
+    }
+  }
+}
+
+public enum TFLiteModelResult {
+  case success(PredictionResult)
+  case failure(TFLiteModelError)
+}
+
 public class TFLiteModel {
   private var interpreter: Interpreter
 
@@ -59,10 +78,10 @@ public class TFLiteModel {
 
   /// Runs inference on the given input data.
   /// Adjust the input and output processing as needed for your model.
-  public func runInference(inputData: Data) -> PredictionResult? {
+  public func runInference(inputData: Data) -> TFLiteModelResult {
     do {
-      let inputTensor = try interpreter.input(at: 0)
-      print("Expected shape:", inputTensor.shape)
+//      let inputTensor = try interpreter.input(at: 0)
+//      print("Expected shape:", inputTensor.shape)
 
       try interpreter.copy(inputData, toInputAt: 0)
       try interpreter.invoke()
@@ -71,74 +90,18 @@ public class TFLiteModel {
       guard
         let predictedClassIndex = predictedClassIndex(from: outputTensor.data),
         let predictedClass = supportedClasses.first(where: { $0.index == predictedClassIndex }) else {
-        return nil
+        return .failure(TFLiteModelError.invalidClass)
       }
-      print("Predicted class index: \(predictedClassIndex), \(predictedClass)")
+//      print("Predicted class index: \(predictedClassIndex), \(predictedClass)")
 
       let result = PredictionResult(
         classification: predictedClass,
         data: inputData
       )
-      return result
+      return .success(result)
     } catch {
       print("Error during inference: \(error)")
-      return nil
-    }
-  }
-
-  public func runBatchInference(inputData: [Data]) async -> [PredictionResult] {
-    await withCheckedContinuation { continuation in
-      DispatchQueue.global(qos: .userInitiated).async {
-        var outputs: [PredictionResult] = []
-        for data in inputData {
-          if let result = self.runInference(inputData: data) {
-            outputs.append(result)
-          } else {
-            outputs.append(
-              PredictionResult(
-                classification: PredictionClasses(
-                  index: -1,
-                  name: "Unknown",
-                  readableName: "Unknown",
-                  description: "Unknown"
-                ),
-                data: data
-              )
-            )
-          }
-        }
-
-        let finalOutputs = outputs  // Capture outputs immutably
-        DispatchQueue.main.async {
-          continuation.resume(returning: finalOutputs)
-        }
-      }
-    }
-  }
-
-  public func runBatchInference(inputData: [Data], completion: @escaping ([PredictionResult]) -> Void) {
-    DispatchQueue.global(qos: .userInitiated).async {
-      var outputs: [PredictionResult] = []
-      for data in inputData {
-        if let result = self.runInference(inputData: data) {
-          outputs.append(result)
-        } else {
-          outputs.append(
-            PredictionResult(
-              classification: PredictionClasses(
-                index: -1,
-                name: "Unknwon",
-                readableName: "Unknown",
-                description: "Unknown"
-              ),
-              data: data
-            )
-          )
-        }
-      }
-      DispatchQueue.main.async {
-        completion(outputs)
-      }
+      return .failure(TFLiteModelError.unknwownError(error))
     }
   }
 }

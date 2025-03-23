@@ -9,7 +9,7 @@ import Combine
 
 public final class HomeState: ObservableObject {
   @Published public var didSelectSettings: Bool = false
-  @Published public var didSelectScan: Bool?
+  @Published public var didSelectScan: Bool = false
 
   public init() {}
 }

@@ -210,4 +210,8 @@ public extension Font.EcoSort {
   static var body: Font { .custom(FontName.PTRegular.title, size: 16, relativeTo: .body) }
   static var bodyS: Font { .custom(FontName.PTRegular.title, size: 13, relativeTo: .body) }
   static var bodyL: Font { .custom(FontName.PTRegular.title, size: 24, relativeTo: .body) }
+
+  static func ecoCustom(_ name: FontName, size: CGFloat, relativeTo textStyle: Font.TextStyle) -> Font {
+    return Font.custom(name.title, size: size, relativeTo: textStyle)
+  }
 }

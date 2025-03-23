@@ -9,22 +9,27 @@ import Foundation
 import SwiftData
 
 @Model
-final class PredictionSessionMedia {
-  @Attribute(.unique) var id: UUID
+public final class PredictionSessionMedia {
+  @Attribute(.unique) public var id: UUID
   @Attribute(.unique) var name: String
-  var mediaType: PredictionMediaType
+  var mediaType: SessionPredictionMediaType
   @Attribute(.externalStorage) var data: Data
+  @Attribute(.externalStorage) var resizedData: Data
 
   var session: PredictionSessionModel?
 
   var predictedClass: SessionGroupClass?
   var actualClass: SessionGroupClass?
+  var isPredictionAccurate: Bool {
+    predictedClass?.id == actualClass?.id
+  }
 
   init(
     id: UUID,
     name: String,
-    mediaType: PredictionMediaType,
+    mediaType: SessionPredictionMediaType,
     data: Data,
+    resizedData: Data,
     session: PredictionSessionModel? = nil,
     predictedClass: SessionGroupClass? = nil,
     actualClass: SessionGroupClass? = nil
@@ -33,6 +38,7 @@ final class PredictionSessionMedia {
     self.name = name
     self.mediaType = mediaType
     self.data = data
+    self.resizedData = resizedData
     self.session = session
     self.predictedClass = predictedClass
     self.actualClass = actualClass

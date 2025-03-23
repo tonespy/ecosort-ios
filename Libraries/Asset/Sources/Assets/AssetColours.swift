@@ -47,6 +47,7 @@ public extension Color.EcoSort {
     public static let black = Color("baseBlack", bundle: .sharedResources)
     public static let white = Color("baseWhite", bundle: .sharedResources)
     public static let border = Color("baseBorder", bundle: .sharedResources)
+    public static let imageBg = Color("baseImagebg", bundle: .sharedResources)
   }
 }
 
@@ -103,7 +104,7 @@ public extension Color.EcoSort {
 
 public extension Color.EcoSort {
   struct Neutral {
-    public static let neutralO = Color("Neutral-0", bundle: .sharedResources)
+    public static let neutral0 = Color("Neutral-0", bundle: .sharedResources)
     public static let neutral1 = Color("Neutral-1", bundle: .sharedResources)
     public static let neutral2 = Color("Neutral-2", bundle: .sharedResources)
     public static let neutral3 = Color("Neutral-3", bundle: .sharedResources)
@@ -122,5 +123,6 @@ public extension Color.EcoSort {
     public static let text3 = Color("Text-3", bundle: .sharedResources)
     public static let text4 = Color("Text-4", bundle: .sharedResources)
     public static let text5 = Color("Text-5", bundle: .sharedResources)
+    public static let text6 = Color("Text-6", bundle: .sharedResources)
   }
 }

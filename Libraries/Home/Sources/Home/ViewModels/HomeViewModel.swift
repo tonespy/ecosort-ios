@@ -5,10 +5,87 @@
 //  Created by Abubakar Oladeji on 09/02/2025.
 //
 
+import SwiftUI
+import Assets
 import Combine
 import Factory
 import Foundation
 import Platform
+import SwiftData
+
+enum ViewSessionModelState: Sendable, Identifiable {
+  var id: Self { self }
+  case reviewed
+  case unReviewed
+  case failedProcessing
+
+  var title: String {
+    switch self {
+    case .reviewed:
+      return "Reviewed"
+    case .unReviewed:
+      return "UnReviewed"
+    case .failedProcessing:
+      return "Failed Processing"
+    }
+  }
+}
+
+struct ViewSessionSection: Sendable, Identifiable {
+  let id: UUID = UUID()
+  let type: ViewSessionModelState
+  let models: [ViewSessionModel]
+
+  init(type: ViewSessionModelState, models: [ViewSessionModel]) {
+    self.type = type
+    self.models = models
+  }
+}
+
+struct ViewSessionModel: Sendable, Identifiable {
+  let id: UUID = UUID()
+  let when: String
+  let reviewPercentage: Double
+  let accuracyTitle: String
+  let mediaType: String
+  let accuracy: Double
+  let groupName: String
+  let state: ViewSessionModelState
+  let imagesPreview: [Data]
+  let totalImagCount: Int
+  let imageText: String
+  let modelId: UUID
+
+  init(
+    when: String,
+    reviewPercentage: Double,
+    accuracyTitle: String,
+    accuracy: Double,
+    groupName: String,
+    state: ViewSessionModelState,
+    imagesPreview: [Data],
+    totalImagCount: Int,
+    imageText: String,
+    mediaType: String,
+    modelId: UUID
+  ) {
+    self.when = when
+    self.reviewPercentage = reviewPercentage
+    self.accuracyTitle = accuracyTitle
+    self.accuracy = accuracy
+    self.groupName = groupName
+    self.state = state
+    self.imagesPreview = imagesPreview
+    self.totalImagCount = totalImagCount
+    self.imageText = imageText
+    self.modelId = modelId
+    self.mediaType = mediaType
+  }
+
+  var images: [UIImage] {
+    imagesPreview.compactMap(UIImage.init)
+  }
+}
 
 enum FilePickerFlow: String, Identifiable {
   var id: Self { self }
@@ -49,13 +126,27 @@ public final class HomeViewModel: ObservableObject {
   @Published var finalMediaOption: FilePickerFlow = .unknown
   @Published var showMediaAlbumOrDocumentPicker: Bool = false
   @Published var mediaResult: EcoAlbumPickerResult?
+  @Published var selectedImages: [VideoFrameResult] = []
+  @Published var selectedVideoUrl: URL?
+
+  @Published var showProcessingUI: Bool = false
+
+  @Published var progressMessage: String?
 
   private var subscriptions = Set<AnyCancellable>()
+
+  private var modelContext: ModelContext?
+  private(set) var modelDataSource: PredictionModelDataSource?
 
   public init(downloadManager: DownloadManager, predictionService: PredictionAPIService) {
     self.downloadManager = downloadManager
     self.predictionService = predictionService
     observe()
+  }
+
+  func setModelContext(_ context: ModelContext) {
+    self.modelContext = context
+    self.modelDataSource = PredictionModelDataSource(context)
   }
 
   private func observe() {
@@ -97,50 +188,129 @@ public final class HomeViewModel: ObservableObject {
       .dropFirst()
       .sink { result in
         self.showMediaAlbumOrDocumentPicker = false
+        self.progressMessage = nil
         guard let result else { return }
-        print("Results: ", result)
+        switch result {
+        case .processing(let processing):
+          print("Processing: ", processing)
+          self.progressMessage = processing
+        case .failed(let error):
+          print("Error: \(error)")
+        case .cancelled:
+          print("User cancelled the operation.")
+        case .images(let images):
+          self.selectedImages = images
+          self.selectedVideoUrl = nil
+          self.showProcessingUI = true
+        case .video(let url, let frames):
+          self.selectedVideoUrl = url
+          self.selectedImages = frames
+          self.showProcessingUI = true
+        }
       }
       .store(in: &subscriptions)
   }
 
-  private func getDefaultModel() throws -> URL {
-    guard let defaultModel = UserDefaults.standard.userPreference?.savedModels.first(
-      where: { $0.isDefault
-      })?.model else {
-      throw NSError(domain: "Default model not found!!!", code: 0, userInfo: nil)
+  func handleSessions(_ sessions: [PredictionSessionModel]) -> [ViewSessionSection] {
+    var reviewedSection = [ViewSessionModel]()
+    var unreviewedSection = [ViewSessionModel]()
+    var failedSection = [ViewSessionModel]()
+
+    for session in sessions {
+      let dateFormatter = DateFormatter()
+      dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+      let locale = Locale.current
+      if let format = DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: locale) {
+        if format.contains("a") {
+          dateFormatter.dateFormat = "dd MMM yyyy 'at' hh:mm a"
+        } else {
+          dateFormatter.dateFormat = "dd MMM yyyy 'at' HH:mm"
+        }
+      }
+      let currentDateString = dateFormatter.string(from: session.date)
+
+      // Calculate review percentage
+      let imageCount = session.images.count
+      let reviewedCount = session.images.filter { $0.actualClass != nil }.count
+      let predictedCount = session.images.filter { $0.predictedClass != nil }.count
+      let reviewPercentage = Double(reviewedCount) / Double(imageCount) * 100
+
+      // Set
+
+      // Set Media Type
+      let mediaType = session.videoPath != nil ? "Video" : "Image"
+
+      // Local Group Information
+      let localGroupName = session.predictionGroups.first?.localGroupName ?? "Unknown"
+
+      // Images to preview
+      let allImages = session.images.map(\.data)
+      let firstFive: [Data] = allImages.enumerated().prefix(5).map(\.1)
+      let suffix = session.videoPath != nil ? "image" : "frame"
+      let imageText = imageCount == 1 ? "\(imageCount) \(suffix)" : "\(imageCount) \(suffix)s"
+
+      let sessionState = predictedCount != imageCount ? ViewSessionModelState.failedProcessing : reviewedCount != imageCount ? ViewSessionModelState.unReviewed : .reviewed
+
+      let finalModel = ViewSessionModel(
+        when: currentDateString,
+        reviewPercentage: reviewPercentage,
+        accuracyTitle: "Accuracy",
+        accuracy: reviewPercentage,
+        groupName: localGroupName,
+        state: sessionState,
+        imagesPreview: firstFive,
+        totalImagCount: imageCount,
+        imageText: imageText,
+        mediaType: mediaType,
+        modelId: session.id
+      )
+
+      switch sessionState {
+      case .failedProcessing:
+        failedSection.append(finalModel)
+      case .unReviewed:
+        unreviewedSection.append(finalModel)
+      case .reviewed:
+        reviewedSection.append(finalModel)
+      }
     }
 
-    // Get the documents directory url
-    let path = try FileManager.default.url(
-      for: .documentDirectory,
-      in: .userDomainMask,
-      appropriateFor: nil,
-      create: true
-    ).appendingPathComponent("tflite_models", isDirectory: true)
+    var section = [ViewSessionSection]()
+    if !failedSection.isEmpty {
+      section
+        .append(
+          ViewSessionSection(type: .failedProcessing, models: failedSection)
+        )
+    }
 
-    return path
-      .appendingPathComponent("v\(defaultModel.version)")
-      .appendingPathExtension("tflite")
+    if !unreviewedSection.isEmpty {
+      section
+        .append(
+          ViewSessionSection(type: .unReviewed, models: unreviewedSection)
+        )
+    }
+    if !reviewedSection.isEmpty {
+      section
+        .append(
+          ViewSessionSection(type: .reviewed, models: reviewedSection)
+        )
+    }
+
+    return section
   }
 
-  func runInference(data: Data) {
-    guard let modelPath = try? getDefaultModel() else {
-      print("Path not present")
-      return
-    }
+  func handleModelSession(_ model: PredictionSessionModel) {
+    self.mediaResult = nil
+    self.selectedImages = []
+    self.selectedVideoUrl = nil
+    self.showProcessingUI = false
+  }
 
-    print("Using Path: \(modelPath)")
-    guard let model = TFLiteModel(modelPath: modelPath.path()) else {
-      print("Failed to load TFLite model.")
-      return
-     }
-
-    guard let inferenceCheck = model.runInference(inputData: data) else {
-      print("Inference failed.")
-      return
-    }
-
-    print("Output Data: \(inferenceCheck)")
+  func stopProcessingImages() {
+    self.mediaResult = nil
+    self.selectedImages = []
+    self.selectedVideoUrl = nil
+    self.showProcessingUI = false
   }
 }
 

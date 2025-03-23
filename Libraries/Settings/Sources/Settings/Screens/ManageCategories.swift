@@ -143,30 +143,4 @@ struct ManageCategories: View {
     .pickerStyle(.menu)
     .disabled(viewModel.isEditing)
   }
-
-//  private var categoryInput: some View {
-//    HStack(spacing: SpacingSize.medium.value) {
-//      TextField(
-//        "Enter comma-separated grouping...",
-//        text: $viewModel.groups
-//      )
-//      .textInputAutocapitalization(.never)
-//      .disableAutocorrection(true)
-//      .font(Font.EcoSort.bodyS)
-//
-//      Button {} label: {
-//        Text("Save")
-//          .font(Font.EcoSort.body)
-//          .foregroundColor(.EcoSort.Text.textO)
-//          .padding()
-//          .disabled(viewModel.groups.count == 0)
-//          .background(
-//            RoundedRectangle(cornerRadius: SpacingSize.small.value)
-//              .fill(Color.EcoSort.Button.primary)
-//          )
-//      }
-//    }
-//    .textFieldStyle(OutlinedTextFieldStyle())
-//    .padding()
-//  }
 }

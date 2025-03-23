@@ -59,7 +59,7 @@ public struct SpinnerLoadingView: View {
         
         Circle()
           .trim(from: 0.66, to: self.fillRatio2)
-          .stroke(Color.EcoSort.Neutral.neutralO, style: StrokeStyle(lineWidth: 5))
+          .stroke(Color.EcoSort.Neutral.neutral0, style: StrokeStyle(lineWidth: 5))
           .rotationEffect(.init(degrees: -180))
           .onAnimationCompleted(for: self.fillRatio2) {
             self.fillRatio2 = 0.66

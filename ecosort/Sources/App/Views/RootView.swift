@@ -9,6 +9,7 @@ import Factory
 import Home
 import SwiftUI
 import Settings
+import SwiftData
 
 struct RootView: View {
   @StateObject private var appCoordinator: AppCoordinator = .init()
@@ -18,6 +19,12 @@ struct RootView: View {
     ZStack {
       HomeScreen(viewModel: Container.shared.homwViewModel.resolve())
         .environmentObject(appCoordinator.homeState)
+        .modelContainer(for: [
+          PredictionSessionModel.self,
+          PredictionSessionGroup.self,
+          SessionGroupClass.self,
+          PredictionSessionMedia.self
+        ])
     }
     .onReceive(appCoordinator.$settingsState) {
       showSettings = $0 != nil
