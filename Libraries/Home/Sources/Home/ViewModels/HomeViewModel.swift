@@ -130,8 +130,9 @@ public final class HomeViewModel: ObservableObject {
   @Published var selectedVideoUrl: URL?
 
   @Published var showProcessingUI: Bool = false
-
   @Published var progressMessage: String?
+
+  @Published var selectedSession: ViewSessionModel?
 
   private var subscriptions = Set<AnyCancellable>()
 
@@ -233,7 +234,11 @@ public final class HomeViewModel: ObservableObject {
       let imageCount = session.images.count
       let reviewedCount = session.images.filter { $0.actualClass != nil }.count
       let predictedCount = session.images.filter { $0.predictedClass != nil }.count
+      let accuratePredictedCount = session.images.filter {
+        $0.isPredictionAccurate && $0.actualClass != nil
+      }.count
       let reviewPercentage = Double(reviewedCount) / Double(imageCount) * 100
+      let accuracyPercentage = Double(accuratePredictedCount) / Double(predictedCount) * 100
 
       // Set
 
@@ -246,7 +251,7 @@ public final class HomeViewModel: ObservableObject {
       // Images to preview
       let allImages = session.images.map(\.data)
       let firstFive: [Data] = allImages.enumerated().prefix(5).map(\.1)
-      let suffix = session.videoPath != nil ? "image" : "frame"
+      let suffix = session.videoPath != nil ? "frame" : "image"
       let imageText = imageCount == 1 ? "\(imageCount) \(suffix)" : "\(imageCount) \(suffix)s"
 
       let sessionState = predictedCount != imageCount ? ViewSessionModelState.failedProcessing : reviewedCount != imageCount ? ViewSessionModelState.unReviewed : .reviewed
@@ -255,7 +260,7 @@ public final class HomeViewModel: ObservableObject {
         when: currentDateString,
         reviewPercentage: reviewPercentage,
         accuracyTitle: "Accuracy",
-        accuracy: reviewPercentage,
+        accuracy: accuracyPercentage,
         groupName: localGroupName,
         state: sessionState,
         imagesPreview: firstFive,

@@ -51,7 +51,7 @@ final class ProcessMediaViewModel: ObservableObject {
   @Published var processingMessage: String?
   @Published var errorMesaage: String? = nil
   @Published var groupConfigMessage: String? = nil
-  @Published var buttonTitle: String = "Save"
+  @Published var buttonTitle: String = "Start prediction"
   @Published var buttonDisabled: Bool = true
   var onComplete: ((PredictionSessionModel) -> Void)? = nil
 
@@ -339,7 +339,7 @@ final class ProcessMediaViewModel: ObservableObject {
         return SessionGroupClass(
           id: UUID(),
           name: classInfo.name,
-          displayName: classInfo.description,
+          displayName: classInfo.readableName,
           classDescription: classInfo.description
         )
       }

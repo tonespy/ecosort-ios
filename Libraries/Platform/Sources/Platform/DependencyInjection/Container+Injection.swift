@@ -10,11 +10,13 @@ import Foundation
 
 public extension Container {
   private var baseURL: URL {
-    #if DEBUG
-    return URL(string: "http://localhost:5500")!
-    #else
-    return URL(string: "to be discussed")!
-    #endif
+    let baseUrl = Bundle.main.object(forInfoDictionaryKey: "BASE_URL") as? String
+    let baseUrlProtocol = Bundle.main.object(forInfoDictionaryKey: "BASE_URL_PROTOCOL") as? String
+    if let baseUrl = baseUrl, let baseUrlProtocol = baseUrlProtocol {
+      return URL(string: "\(baseUrlProtocol)://\(baseUrl)")!
+    } else {
+      return URL(string: "to be discussed")!
+    }
   }
   
   /// A singleton DownloadManager.

@@ -21,96 +21,116 @@ public struct HomeScreen: View {
   @State var isMenuOpen: Bool = false
 
   public var body: some View {
-    ZStack {
-      Color.EcoSort.Base.background
-        .ignoresSafeArea()
-      ScrollView {
-        LazyVStack(
-          alignment: .leading,
-          spacing: SpacingSize.medium.value,
-          pinnedViews: [.sectionHeaders]
-        ) {
-          sectionedList
-            .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.EcoSort.Base.background)
-        }
-      }.overlay {
-        if modelSessions.isEmpty {
-          ContentUnavailableView {
-            EmptyHomeView()
-              .environmentObject(viewModel)
+    NavigationStack {
+      ZStack {
+        Color.EcoSort.Base.background
+          .ignoresSafeArea()
+        ScrollView {
+          LazyVStack(
+            alignment: .leading,
+            spacing: SpacingSize.medium.value,
+            pinnedViews: [.sectionHeaders]
+          ) {
+            sectionedList
+              .listRowSeparator(.hidden)
+              .listRowInsets(EdgeInsets())
+              .listRowBackground(Color.EcoSort.Base.background)
+          }
+        }.overlay {
+          if modelSessions.isEmpty {
+            ContentUnavailableView {
+              EmptyHomeView()
+                .environmentObject(viewModel)
+            }
           }
         }
-      }
-      .listStyle(.grouped)
-      .background(Color.EcoSort.Base.background)
-      .scrollContentBackground(.hidden)
+        .listStyle(.grouped)
+        .background(Color.EcoSort.Base.background)
+        .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
 
-      if let progressMessage = viewModel.progressMessage {
-        ZStack {
-          // A full-screen semi-transparent overlay to block interaction.
-          Color.black.opacity(0.5)
-            .ignoresSafeArea()
+        if let progressMessage = viewModel.progressMessage {
+          ZStack {
+            // A full-screen semi-transparent overlay to block interaction.
+            Color.black.opacity(0.5)
+              .ignoresSafeArea()
 
-          VStack(spacing: 16) {
-            ProgressView(progressMessage)
-              .progressViewStyle(CircularProgressViewStyle(tint: .white))
-            Text(progressMessage)
-              .foregroundColor(.white)
-              .multilineTextAlignment(.center)
+            VStack(spacing: 16) {
+              ProgressView(progressMessage)
+                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+              Text(progressMessage)
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+            }
+            .padding()
           }
-          .padding()
+          .transition(.opacity)
         }
-        .transition(.opacity)
+
       }
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color.EcoSort.Base.background)
-    .overlay(toggleView, alignment: .bottomTrailing)
-    .onAppear {
-      viewModel.setModelContext(modelContext)
-    }
-    .snackbar(
-      show: $viewModel.isDownloadCompleted,
-      message: "Model\(viewModel.downloadedModelVersion) downloaded successfully!"
-    )
-    .sheet(isPresented: $viewModel.showMediaPicker) {
-      FilePickerFlowView()
-        .environmentObject(viewModel)
-        .presentationDetents([.fraction(0.25)])
-    }
-    .sheet(isPresented: $viewModel.showMediaAlbumOrDocumentPicker) {
-      switch viewModel.finalMediaOption {
-      case .photoInAlbum:
-        EcoAlbumMediaPicker(result: $viewModel.mediaResult, type: .images)
-      case .photoInDocument:
-        EcoDocumentMediaPicker(result: $viewModel.mediaResult, type: .images)
-      case .videoInAlbum:
-        EcoAlbumMediaPicker(result: $viewModel.mediaResult, type: .video)
-      case .videoInDocument:
-        EcoDocumentMediaPicker(result: $viewModel.mediaResult, type: .video)
-      default:
-        EmptyView()
-      }
-    }
-    .sheet(isPresented: $viewModel.showProcessingUI) {
-      ProcessMediaView()
-      { sessionModel in
-        viewModel.handleModelSession(sessionModel)
-      } onDismiss: {
-        print("Dismiss Called here")
-        viewModel.stopProcessingImages()
-      }
-      .environmentObject(
-        ProcessMediaViewModel(
-          modelDataSource: viewModel.modelDataSource!,
-          images: viewModel.selectedImages,
-          videoUrl: viewModel.selectedVideoUrl
-        )
+      .navigationDestination(
+        isPresented: $homeState.showSessionReviewScreen,
+        destination: {
+          if let sessionId = viewModel.selectedSession?.modelId {
+            HomeReviewScreen(sessionId: sessionId)
+              .modelContainer(for: [
+                PredictionSessionModel.self,
+                PredictionSessionGroup.self,
+                SessionGroupClass.self,
+                PredictionSessionMedia.self
+              ])
+          } else {
+            EmptyView()
+          }
+        }
       )
-      .interactiveDismissDisabled()
-      .presentationDetents([.fraction(0.5)])
+      .background(Color.EcoSort.Base.background)
+      .overlay(toggleView, alignment: .bottomTrailing)
+      .onAppear {
+        viewModel.setModelContext(modelContext)
+      }
+      .navigationBarTitleDisplayMode(.inline)
+      .snackbar(
+        show: $viewModel.isDownloadCompleted,
+        message: "Model\(viewModel.downloadedModelVersion) downloaded successfully!"
+      )
+      .sheet(isPresented: $viewModel.showMediaPicker) {
+        FilePickerFlowView()
+          .environmentObject(viewModel)
+          .presentationDetents([.fraction(0.25)])
+      }
+      .sheet(isPresented: $viewModel.showMediaAlbumOrDocumentPicker) {
+        switch viewModel.finalMediaOption {
+        case .photoInAlbum:
+          EcoAlbumMediaPicker(result: $viewModel.mediaResult, type: .images)
+        case .photoInDocument:
+          EcoDocumentMediaPicker(result: $viewModel.mediaResult, type: .images)
+        case .videoInAlbum:
+          EcoAlbumMediaPicker(result: $viewModel.mediaResult, type: .video)
+        case .videoInDocument:
+          EcoDocumentMediaPicker(result: $viewModel.mediaResult, type: .video)
+        default:
+          EmptyView()
+        }
+      }
+      .sheet(isPresented: $viewModel.showProcessingUI) {
+        ProcessMediaView()
+        { sessionModel in
+          viewModel.handleModelSession(sessionModel)
+        } onDismiss: {
+          print("Dismiss Called here")
+          viewModel.stopProcessingImages()
+        }
+        .environmentObject(
+          ProcessMediaViewModel(
+            modelDataSource: viewModel.modelDataSource!,
+            images: viewModel.selectedImages,
+            videoUrl: viewModel.selectedVideoUrl
+          )
+        )
+        .interactiveDismissDisabled()
+        .presentationDetents([.fraction(0.5)])
+      }
     }
   }
 
@@ -192,7 +212,8 @@ public struct HomeScreen: View {
                 .foregroundColor(Color.EcoSort.Neutral.neutral1)
             }
             .onTapGesture {
-              print("Tapped on card")
+              viewModel.selectedSession = model
+              homeState.showSessionReviewScreen.toggle()
             }
           }
           .padding([.leading, .trailing])

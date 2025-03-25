@@ -4,6 +4,10 @@
 <dict>
 	<key>API_REQ_KEY</key>
 	<string>$(API_REQ_KEY)</string>
+	<key>BASE_URL</key>
+	<string>$(BASE_URL)</string>
+	<key>BASE_URL_PROTOCOL</key>
+	<string>$(BASE_URL_PROTOCOL)</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array/>
 	<key>CFBundleDocumentTypes</key>

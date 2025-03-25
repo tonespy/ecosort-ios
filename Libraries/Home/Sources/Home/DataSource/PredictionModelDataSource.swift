@@ -15,8 +15,17 @@ final class PredictionModelDataSource {
     self.modelContext = modelContext
   }
 
-  func fetchSessionModel() throws -> [PredictionSessionModel] {
+  func fetchSessions() throws -> [PredictionSessionModel] {
     try modelContext.fetch(FetchDescriptor<PredictionSessionModel>())
+  }
+
+  func fetchSession(with identifier: UUID) throws -> PredictionSessionModel? {
+    var descriptor = FetchDescriptor<PredictionSessionModel>(
+      predicate: #Predicate { $0.id == identifier }
+    )
+    descriptor.fetchLimit = 1
+    let result = try modelContext.fetch(descriptor)
+    return result.first
   }
 
   func insertSessionModel(_ sessionModel: PredictionSessionModel) {
