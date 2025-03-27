@@ -6,9 +6,13 @@
     <string>org.tensorflow.lite</string>
     <key>CFBundleExecutable</key>
     <string>TensorFlowLite</string>
-    <key>CFBundleVersion</key>
+    <key>CFBundleShortVersionString</key>
     <string>2.17.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
     <key>CFBundlePackageType</key>
     <string>FMWK</string>
+    <key>MinimumOSVersion</key>
+    <string>17.6</string>
 </dict>
 </plist>

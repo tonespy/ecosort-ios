@@ -178,6 +178,6 @@ public final class SettingsViewModel: ObservableObject {
       return
     }
 
-    sections = createModelSection(userPreferences) + createNotificationSection(userPreferences)
+    sections = createModelSection(userPreferences) //+ createNotificationSection(userPreferences)
   }
 }

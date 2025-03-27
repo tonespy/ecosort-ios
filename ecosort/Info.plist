@@ -9,13 +9,8 @@
 	<key>BASE_URL_PROTOCOL</key>
 	<string>$(BASE_URL_PROTOCOL)</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array/>
-	<key>CFBundleDocumentTypes</key>
 	<array>
-		<dict>
-			<key>LSHandlerRank</key>
-			<string>Default</string>
-		</dict>
+		<string>com.ecosort.cloud-ai-prediction</string>
 	</array>
 	<key>MODEL_RELEASE_API_KEY</key>
 	<string>$(MODEL_RELEASE_API_KEY)</string>
@@ -23,21 +18,6 @@
 	<array>
 		<string>fetch</string>
 		<string>processing</string>
-	</array>
-	<key>UTExportedTypeDeclarations</key>
-	<array>
-		<dict>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>public.data</string>
-			</array>
-			<key>UTTypeDescription</key>
-			<string>Item sorting drag and drop</string>
-			<key>UTTypeIdentifier</key>
-			<string>com.ecosort.item_drag_and_drop</string>
-			<key>UTTypeTagSpecification</key>
-			<dict/>
-		</dict>
 	</array>
 </dict>
 </plist>
