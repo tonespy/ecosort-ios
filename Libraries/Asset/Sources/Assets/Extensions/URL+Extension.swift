@@ -13,6 +13,12 @@ public struct VideoFrameResult: Sendable {
   public let data: Data
   public let resizedData: Data
   public let image: UIImage
+
+  public init(data: Data, resizedData: Data, image: UIImage) {
+    self.data = data
+    self.resizedData = resizedData
+    self.image = image
+  }
 }
 
 public extension URL {

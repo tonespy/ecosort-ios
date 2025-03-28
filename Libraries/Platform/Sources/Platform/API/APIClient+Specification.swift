@@ -13,6 +13,7 @@ public extension APIClient {
     var method: HttpMethod { get }
     var returnType: DecodableType.Type { get }
     var body: Data? { get }
+    var bodyWithBoundary: [String: Data]? { get }
   }
   
   enum HttpMethod: String, CaseIterable {

@@ -14,13 +14,15 @@ import Settings
 
 extension Container {
   private var baseURL: URL {
-    #if DEBUG
-      return URL(string: "http://localhost:5500")!
-    #else
+    let baseUrl = Bundle.main.object(forInfoDictionaryKey: "BASE_URL") as? String
+    let baseUrlProtocol = Bundle.main.object(forInfoDictionaryKey: "BASE_URL_PROTOCOL") as? String
+    if let baseUrl = baseUrl, let baseUrlProtocol = baseUrlProtocol {
+      return URL(string: "\(baseUrlProtocol)://\(baseUrl)")!
+    } else {
       return URL(string: "to be discussed")!
-    #endif
+    }
   }
-  
+
   /// A singleton DownloadManager.
   var downloadManager: Factory<DownloadManager> {
     self { DownloadManager() }.singleton

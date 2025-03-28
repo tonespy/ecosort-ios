@@ -9,6 +9,7 @@ import Assets
 import Combine
 import Foundation
 import Platform
+import SwiftUI
 
 enum MediaProcessingState {
   case idle
@@ -39,7 +40,9 @@ enum PredictionFlows {
   case predicting
 }
 
+@MainActor
 final class ProcessMediaViewModel: ObservableObject {
+  private let predictionService: PredictionAPIService
   private let modelDataSource: PredictionModelDataSource
   let images: [VideoFrameResult]
   let videoUrl: URL?
@@ -51,15 +54,18 @@ final class ProcessMediaViewModel: ObservableObject {
   @Published var processingMessage: String?
   @Published var errorMesaage: String? = nil
   @Published var groupConfigMessage: String? = nil
-  @Published var buttonTitle: String = "Start prediction"
+  @Published var buttonTitle: String = ""
   @Published var buttonDisabled: Bool = true
-  var onComplete: ((PredictionSessionModel) -> Void)? = nil
+  var onComplete: ((String) -> Void)? = nil
 
   private var userPredictionType = PredictionType.cloudAI
   private var defaultModel: SavedModel?
   private var currentModelSession: PredictionSessionModel?
+  let needsRetry: Bool
 
-  @Published private var currentFlowState: PredictionFlows = .initial
+  private var allImageDict = [String: Data]()
+
+  @Published var currentFlowState: PredictionFlows = .initial
 
   private var cancellables: Set<AnyCancellable> = []
 
@@ -67,12 +73,41 @@ final class ProcessMediaViewModel: ObservableObject {
     modelDataSource: PredictionModelDataSource,
     images: [VideoFrameResult],
     videoUrl: URL?,
-    currentModelSession: PredictionSessionModel? = nil
+    currentModelSession: UUID? = nil,
+    predictionService: PredictionAPIService
   ) {
     self.modelDataSource = modelDataSource
-    self.images = images
-    self.videoUrl = videoUrl
-    self.currentModelSession = currentModelSession
+    self.predictionService = predictionService
+    self.needsRetry = currentModelSession != nil
+
+    let videoPath: URL?
+    if let currentModelSession {
+      let session = try? modelDataSource.fetchSession(with: currentModelSession)
+      self.currentModelSession = session
+      if let session {
+        self.images = session.images.map {
+          VideoFrameResult(
+            data: $0.data,
+            resizedData: $0.resizedData,
+            image: UIImage(data: $0.data)!
+          )
+        }
+        self.allImageDict = session.images.reduce(into: [:]) { result, element in
+          result[element.id.uuidString] = element.data
+        }
+        videoPath = session.videoPath.flatMap { URL(string: $0) }
+        self.groupConfigMessage = session.predictionGroups.first?.name
+      } else {
+        self.images = []
+        videoPath = nil
+      }
+    } else {
+      self.currentModelSession = nil
+      self.images = images
+      videoPath = videoUrl
+    }
+    self.videoUrl = videoPath
+
     fetch()
     observe()
   }
@@ -80,19 +115,20 @@ final class ProcessMediaViewModel: ObservableObject {
   private func observe() {
     $selectedPickerId
       .dropFirst()
-      .sink { current in
-        guard !current.isEmpty else {
-          return
-        }
+      .sink { [weak self] current in
+        // Temporary work around for view not reloading
+        guard let self = self, !self.buttonDisabled, !current.isEmpty else { return }
         self.selectedPickerItem = self.pickers.first { $0.id == current }
       }
       .store(in: &cancellables)
 
     $currentFlowState
-      .sink { current in
+      .sink { [weak self] current in
+        guard let self = self else { return }
         switch current {
         case .initial:
           print("Nothing to do here")
+          self.buttonTitle = "Start prediction"
         case .creatingSession:
           self.creatingSession()
         case .addingGroupConfig:
@@ -106,13 +142,19 @@ final class ProcessMediaViewModel: ObservableObject {
         }
       }
       .store(in: &cancellables)
+
+    $buttonTitle.sink { current in
+      print("Current Text: ", current)
+    }
+    .store(in: &cancellables)
   }
 
   private func fetch() {
     let userDefaults = UserDefaults.standard
     guard
       let predictionConfiguration = userDefaults.predictionConfiguration,
-      let userPreference = userDefaults.userPreference else {
+      let userPreference = userDefaults.userPreference
+    else {
       return
     }
 
@@ -121,13 +163,10 @@ final class ProcessMediaViewModel: ObservableObject {
 
     let userGroups = userPreference.savedGroups
       .map { ProcessMediaPicker(group: $0.config, isDefault: $0.isDefault) }
-
     let hasDefault = userGroups.contains(where: \.isDefault)
-
     let systemGroups = predictionConfiguration.groups.map {
       ProcessMediaPicker(group: $0, isDefault: !hasDefault)
     }
-
     var mergedGroups = userGroups + systemGroups
     mergedGroups = mergedGroups.sorted { $0.isDefault && !$1.isDefault }
     self.selectedPickerId = mergedGroups.first?.id ?? ""
@@ -136,33 +175,28 @@ final class ProcessMediaViewModel: ObservableObject {
     self.buttonDisabled = self.selectedPickerItem == nil
   }
 
-  private func updateGroupConfigMessage() {
-    guard let currentModelSession, let firstGroup = currentModelSession.predictionGroups.first else {
-      return
-    }
-
-    self.groupConfigMessage = firstGroup.name
+  private func changeButtonState(_ title: String, disabled: Bool) {
+    self.buttonTitle = title
+    self.buttonDisabled = disabled
   }
 
   private func creatingSession() {
     self.processingMessage = "Preparing session..."
-
+    changeButtonState("Processing...", disabled: true)
     let session = createSessionModel()
     print("Session Model Created")
-
     currentModelSession = session
     currentFlowState = .addingGroupConfig
   }
 
   private func addingGroupConfiguration() {
     guard var session = currentModelSession, let selectedPickerItem = self.selectedPickerItem else {
-      self.processingState = .failed
-      self.errorMesaage = "No session model to add group config to."
+      processingState = .failed
+      errorMesaage = "No session model to add group config to."
       return
     }
-    self.processingMessage = "Adding group configuration to session..."
-    self.buttonTitle = "Processing..."
-
+    processingMessage = "Adding group configuration to session..."
+    changeButtonState("Processing...", disabled: true)
     session = addGroupConfiguration(to: session, from: selectedPickerItem.group)
     print("Group config added")
     currentModelSession = session
@@ -171,16 +205,13 @@ final class ProcessMediaViewModel: ObservableObject {
 
   private func addingImages() {
     guard var session = currentModelSession else {
-      self.processingState = .failed
-      self.errorMesaage = "No session model to add images to."
+      processingState = .failed
+      errorMesaage = "No session model to add images to."
       return
     }
-
-    self.buttonTitle = "Processing..."
-
+    changeButtonState("Processing...", disabled: true)
     let suffix = videoUrl == nil ? "image" : "video frame"
-    self.processingMessage = "Adding \(suffix)(s) to session..."
-
+    processingMessage = "Adding \(suffix)(s) to session..."
     session = addImagesToSessionModel(to: session)
     currentModelSession = session
     currentFlowState = .savingSessionModel
@@ -188,94 +219,145 @@ final class ProcessMediaViewModel: ObservableObject {
 
   private func savingSessionModel() {
     guard let session = currentModelSession else {
-      self.processingState = .failed
-      self.errorMesaage = "No session model to save."
+      processingState = .failed
+      errorMesaage = "No session model to save."
       return
     }
-
-    self.buttonTitle = "Processing..."
-
+    changeButtonState("Processing...", disabled: true)
     do {
       modelDataSource.insertSessionModel(session)
       try modelDataSource.saveSessionModel()
-      self.currentFlowState = .predicting
+      currentFlowState = .predicting
     } catch {
-      self.errorMesaage = "Error saving session model: \(error.localizedDescription)"
-      self.processingState = .failed
-      self.buttonDisabled = false
-      self.buttonTitle = "Retry"
+      errorMesaage = "Error saving session model: \(error.localizedDescription)"
+      processingState = .failed
+      buttonDisabled = false
+      buttonTitle = "Retry"
     }
   }
 
   private func predicting() {
     guard let session = currentModelSession else {
-      self.processingState = .failed
-      self.errorMesaage = "No session model to predict with."
+      processingState = .failed
+      errorMesaage = "No session model to predict with."
       return
     }
-    self.buttonTitle = "Processing..."
-
+    changeButtonState("Predicting...", disabled: true)
     if userPredictionType == .cloudAI {
-      processCloudAIImagePredictions(using: session)
+      processCloudAIImagePredictions()
     } else {
       processOnDeviceAIImagePredictions()
+      onComplete?(session.id.uuidString)
     }
-
-    onComplete?(session)
   }
 
   func attemptProcessing() {
-    guard let _ = self.selectedPickerItem else {
+    // A little helper for now
+    if buttonDisabled { return }
+
+
+    guard selectedPickerItem != nil else {
       errorMesaage = "Please choose a group."
       return
     }
 
-    self.buttonDisabled = true
-
     if currentFlowState == .initial {
-      self.currentFlowState = .creatingSession
+      currentFlowState = .creatingSession
     } else {
-      // Retry mechanism
-      self.currentFlowState = self.currentFlowState
+      currentFlowState = self.currentFlowState // retry mechanism
     }
   }
 
-  private func processCloudAIImagePredictions(using session: PredictionSessionModel) {
-    //
+  private func processCloudAIImagePredictions() {
+    let images = allImageDict
+    Task {
+      do {
+        self.predictionService.progressHandler = { progress in
+          print("Upload progress: \(progress)")
+        }
+        let result = try await self.predictionService.uploadImages(images)
+        self.listenForWebSocketMessages(result.jobID)
+      } catch {
+        print("Error: \(error)")
+        self.showButtonRetry()
+      }
+    }
+  }
+
+  private func showButtonRetry() {
+    changeButtonState("Retry", disabled: false)
+  }
+
+  private func forceCompletePrediction() {
+    guard let session = currentModelSession else { return }
+    onComplete?(session.id.uuidString)
+  }
+
+  private func listenForWebSocketMessages(_ jobID: String) {
+    guard let socketHelper = PredictionWebSocket(jobId: jobID) else {
+      forceCompletePrediction()
+      return
+    }
+    socketHelper.connectWebSocket()
+    var allPredictions = [WSPrediction]()
+    socketHelper.predictionResult = { [weak self] result in
+      guard let self = self else { return }
+      switch result {
+      case .failure(let error):
+        print("Error: \(error)")
+        self.showButtonRetry()
+      case .update(let prediction):
+        allPredictions = prediction.predictions
+        if prediction.progress >= 100 {
+          self.updateImagesWithPredictionInformation(allPredictions)
+        }
+      }
+    }
+  }
+
+  private func updateImagesWithPredictionInformation(_ predictions: [WSPrediction]) {
+    guard let newSession = currentModelSession else {
+      showButtonRetry()
+      return
+    }
+    let sessionId = newSession.id
+    Task {
+      do {
+        let modelActor = try SessionModelActor()
+        _ = try await modelActor.updateSession(withId: sessionId, predictions: predictions)
+        onComplete?(sessionId.uuidString)
+      } catch {
+        print("Error: \(error)")
+      }
+    }
   }
 
   private func getModelPath(from model: SavedModel) throws -> String {
-    // Get the documents directory url
     let path = try FileManager.default.url(
       for: .documentDirectory,
       in: .userDomainMask,
       appropriateFor: nil,
       create: true
     ).appendingPathComponent("tflite_models", isDirectory: true)
-
-    return path
-      .appendingPathComponent("v\(model.model.version)")
+    return path.appendingPathComponent("v\(model.model.version)")
       .appendingPathExtension("tflite")
       .path()
   }
 
   private func processOnDeviceAIImagePredictions() {
     guard let defaultModel, let session = currentModelSession else {
-      self.errorMesaage = "Please set a default model in settings, and afterwards you can try again."
-      self.processingState = .failed
+      errorMesaage = "Please set a default model in settings, and afterwards you can try again."
+      processingState = .failed
       return
     }
-
     do {
       let path = try getModelPath(from: defaultModel)
       guard let tfliteInterpreter = TFLiteModel(modelPath: path) else {
-        self.errorMesaage = "Please set a default model in settings, and afterwards you can try again."
-        self.processingState = .failed
+        errorMesaage = "Please set a default model in settings, and afterwards you can try again."
+        processingState = .failed
         return
       }
-
-      let allGroups = session.predictionGroups.map(\.classes).flatMap(\.self)
-
+      let allGroups = session.predictionGroups.map(\.classes).flatMap { $0 }
       var failedData: [UUID: String] = [:]
       for image in session.images {
         let result = tfliteInterpreter.runInference(inputData: image.resizedData)
@@ -283,35 +365,25 @@ final class ProcessMediaViewModel: ObservableObject {
         case .failure(let error):
           failedData[image.id] = error.errorInformation
         case .success(let prediction):
-          if let firstGroup = allGroups.first(
-            where: { prediction.classification.name == $0.name
-            }) {
+          if let firstGroup = allGroups.first(where: { prediction.classification.name == $0.name }) {
             image.predictedClass = firstGroup
           } else {
             failedData[image.id] = "No matching class found"
           }
         }
       }
-
       if failedData.isEmpty {
         session.predictionState = .done
-        self.processingMessage = "Image predictions completed successfully."
+        processingMessage = "Image predictions completed successfully."
       }
-
       try modelDataSource.saveSessionModel()
     } catch {
-      self.processingState = .failed
-      self.buttonDisabled = false
-      self.buttonTitle = "Retry"
+      processingState = .failed
+      changeButtonState("Retry", disabled: false)
     }
   }
 
   private func createSessionModel() -> PredictionSessionModel {
-    // Get formatted date and time in UTC
-//    let formatter = DateFormatter()
-//    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-//    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-//    let currentDateTime = formatter.string(from: Date())
     let mediaType = videoUrl != nil ? SessionPredictionMediaType.video : SessionPredictionMediaType.image
     let predictionType = userPredictionType == .cloudAI ? SessionPredictionType.cloudAI : SessionPredictionType.onDeviceAI
     let currentDate = Date()
@@ -325,7 +397,6 @@ final class ProcessMediaViewModel: ObservableObject {
       videoPath: videoUrl?.path(),
       images: []
     )
-
     return model
   }
 
@@ -343,7 +414,6 @@ final class ProcessMediaViewModel: ObservableObject {
           classDescription: classInfo.description
         )
       }
-
       return PredictionSessionGroup(
         id: UUID(),
         name: current.name,
@@ -352,16 +422,13 @@ final class ProcessMediaViewModel: ObservableObject {
         session: currentSession
       )
     }
-
     currentSession.predictionGroups = allGroup
-
     return currentSession
   }
 
   private func addImagesToSessionModel(to sessionModel: PredictionSessionModel) -> PredictionSessionModel {
     let mediaType = videoUrl != nil ? SessionPredictionMediaType.video : SessionPredictionMediaType.image
     let currentSession = sessionModel
-
     let allImage = images.map { currentImage in
       return PredictionSessionMedia(
         id: UUID(),
@@ -372,9 +439,10 @@ final class ProcessMediaViewModel: ObservableObject {
         session: currentSession
       )
     }
-
+    allImageDict = allImage.reduce(into: [:]) { result, element in
+      result[element.id.uuidString] = element.data
+    }
     currentSession.images = allImage
     return currentSession
   }
 }
-

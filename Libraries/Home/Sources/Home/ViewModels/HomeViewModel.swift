@@ -114,7 +114,7 @@ enum FilePickerFlow: String, Identifiable {
 
 public final class HomeViewModel: ObservableObject {
   private let downloadManager: DownloadManager
-  private let predictionService: PredictionAPIService
+  let predictionService: PredictionAPIService
 
   @Published var isDownloadInProgress: Bool = false
   @Published var isDownloadCompleted: Bool = false
@@ -131,6 +131,7 @@ public final class HomeViewModel: ObservableObject {
 
   @Published var showProcessingUI: Bool = false
   @Published var progressMessage: String?
+  @Published var showSessionReviewScreen: Bool = false
 
   @Published var selectedSession: ViewSessionModel?
 
@@ -210,6 +211,12 @@ public final class HomeViewModel: ObservableObject {
         }
       }
       .store(in: &subscriptions)
+
+    $showSessionReviewScreen
+      .dropFirst()
+      .sink { status in
+        if !status { self.stopProcessingImages() }
+      }.store(in: &subscriptions)
   }
 
   func handleSessions(_ sessions: [PredictionSessionModel]) -> [ViewSessionSection] {
@@ -304,18 +311,12 @@ public final class HomeViewModel: ObservableObject {
     return section
   }
 
-  func handleModelSession(_ model: PredictionSessionModel) {
-    self.mediaResult = nil
-    self.selectedImages = []
-    self.selectedVideoUrl = nil
-    self.showProcessingUI = false
-  }
-
   func stopProcessingImages() {
     self.mediaResult = nil
     self.selectedImages = []
     self.selectedVideoUrl = nil
     self.showProcessingUI = false
+    self.selectedSession = nil
   }
 }
 

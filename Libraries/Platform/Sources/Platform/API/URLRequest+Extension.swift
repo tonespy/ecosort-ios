@@ -18,7 +18,11 @@ public extension URLRequest {
       printableDescription += " " + urlString
     }
     if let headers = self.allHTTPHeaderFields, !headers.isEmpty {
-      printableDescription += "\\nHeaders: \(headers)"
+      let printableHeaders = headers.map {
+        let value = $0.key.contains("X-API-Key") ? "******" : $0.value
+        return "\($0.key): \(value)"
+      }
+      printableDescription += "\\nHeaders: \(printableHeaders)"
     }
     if let bodyData = self.httpBody,
        let body = String(data: bodyData, encoding: .utf8) {

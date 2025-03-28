@@ -21,7 +21,68 @@ public struct APIClient {
     self.middlewares = middleware
     self.urlSession = urlSession
   }
-  
+
+  public func uploadImages(_ apiSpec: APISpecification, completion: ((Float) -> Void)? = nil) async throws -> DecodableType {
+    guard let url = URL(string: baseURL.absoluteString + apiSpec.endpoint) else {
+      throw NetworkError.invalidURL
+    }
+
+    guard let bodyWithBoundary = apiSpec.bodyWithBoundary, let boundary = bodyWithBoundary.keys.first, let bodyData = bodyWithBoundary.values.first else {
+      throw NetworkError.invalidData
+    }
+
+    var request = URLRequest(
+      url: url,
+      cachePolicy: .useProtocolCachePolicy,
+      timeoutInterval: TimeInterval(floatLiteral: 30.0)
+    )
+    request.httpMethod = apiSpec.method.rawValue
+    request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+    // apply the middlewares
+    var updatedRequest = request
+    for middleware in middlewares {
+      let tempRequest = updatedRequest
+      updatedRequest = try await wrapCatchingErrors {
+        try await middleware.intercept(
+          tempRequest
+        )
+      }
+    }
+    
+    let session = urlSession
+
+    var responseData: Data? = nil
+    do {
+      let (data, response) = try await session.upload(
+        for: updatedRequest,
+        from: bodyData
+      )
+      retrieveLogMiddleware()?.logResponse(response, data: data)
+      try handleResponse(data: data, response: response)
+      responseData = data
+    } catch {
+      throw error
+    }
+
+    guard let responseData else {
+      throw NetworkError.dataConversionFailure
+    }
+
+    let decoder = JSONDecoder()
+    do {
+      let decodedData = try decoder.decode(
+        apiSpec.returnType,
+        from: responseData
+      )
+      return decodedData
+    } catch let error as DecodingError {
+      throw error
+    } catch {
+      throw NetworkError.dataConversionFailure
+    }
+  }
+
   public func sendRequest(_ apiSpec: APISpecification) async throws -> DecodableType {
     guard let url = URL(string: baseURL.absoluteString + apiSpec.endpoint) else {
       throw NetworkError.invalidURL

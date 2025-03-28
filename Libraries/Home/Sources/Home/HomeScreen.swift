@@ -69,7 +69,7 @@ public struct HomeScreen: View {
 
       }
       .navigationDestination(
-        isPresented: $homeState.showSessionReviewScreen,
+        isPresented: $viewModel.showSessionReviewScreen,
         destination: {
           if let sessionId = viewModel.selectedSession?.modelId {
             HomeReviewScreen(sessionId: sessionId)
@@ -114,23 +114,30 @@ public struct HomeScreen: View {
         }
       }
       .sheet(isPresented: $viewModel.showProcessingUI) {
-        ProcessMediaView()
-        { sessionModel in
-          viewModel.handleModelSession(sessionModel)
-        } onDismiss: {
-          print("Dismiss Called here")
-          viewModel.stopProcessingImages()
-        }
-        .environmentObject(
-          ProcessMediaViewModel(
-            modelDataSource: viewModel.modelDataSource!,
-            images: viewModel.selectedImages,
-            videoUrl: viewModel.selectedVideoUrl
-          )
-        )
-        .interactiveDismissDisabled()
-        .presentationDetents([.fraction(0.5)])
+        procesMediaView
+          .interactiveDismissDisabled()
+          .presentationDetents([.fraction(0.5)])
+          .presentationDragIndicator(.visible)
       }
+    }
+  }
+
+  private var procesMediaView: some View {
+    let processViewModel = ProcessMediaViewModel(
+      modelDataSource: viewModel.modelDataSource!,
+      images: viewModel.selectedImages,
+      videoUrl: viewModel.selectedVideoUrl,
+      currentModelSession: viewModel.selectedSession?.modelId,
+      predictionService: viewModel.predictionService
+    )
+
+    return ProcessMediaView(viewModel: processViewModel)
+    { sessionModel in
+      viewModel.stopProcessingImages()
+    } onDismiss: {
+      print("Dismiss Called here")
+      viewModel.stopProcessingImages()
+      viewModel.selectedSession = nil
     }
   }
 
@@ -213,7 +220,11 @@ public struct HomeScreen: View {
             }
             .onTapGesture {
               viewModel.selectedSession = model
-              homeState.showSessionReviewScreen.toggle()
+              if model.state != .failedProcessing {
+                viewModel.showSessionReviewScreen.toggle()
+              } else {
+                viewModel.showProcessingUI = true
+              }
             }
           }
           .padding([.leading, .trailing])
