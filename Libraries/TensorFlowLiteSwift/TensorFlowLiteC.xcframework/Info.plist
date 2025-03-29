@@ -43,7 +43,7 @@
   <key>CFBundleShortVersionString</key>
   <string>2.17.0</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>2</string>
   <key>MinimumOSVersion</key>
   <string>17.6</string>
 </dict>
