@@ -26,7 +26,7 @@ enum ViewSessionModelState: Sendable, Identifiable {
     case .unReviewed:
       return "UnReviewed"
     case .failedProcessing:
-      return "Processing"
+      return "Pending"
     }
   }
 }
