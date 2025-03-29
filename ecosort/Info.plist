@@ -6,6 +6,8 @@
 	<string>$(API_REQ_KEY)</string>
 	<key>BASE_URL</key>
 	<string>$(BASE_URL)</string>
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
 	<key>WEBSOCKET_PROTOCOL</key>
 	<string>$(WEBSOCKET_PROTOCOL)</string>
 	<key>BASE_URL_PROTOCOL</key>
