@@ -88,7 +88,7 @@ public struct EcoDocumentMediaPicker: UIViewControllerRepresentable {
         print("Processing videos...")
         if let url = urls.first {
           do {
-            let moveItem = try url.saveVideoToAppDocument()
+            let moveItem = try url.saveVideoToAppDocument(true)
             print("Moved Item Information: ", moveItem)
             Task.detached {
               await MainActor.run {
@@ -97,7 +97,7 @@ public struct EcoDocumentMediaPicker: UIViewControllerRepresentable {
 
               print("Moved File: ", moveItem)
 
-              let extractedFrames = await moveItem.extractUniqueFramesFromVideo()
+              let extractedFrames = await moveItem.extractFramesFromVideo()
 
               await MainActor.run {
                 if extractedFrames.isEmpty {

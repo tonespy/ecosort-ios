@@ -22,21 +22,26 @@ public struct VideoFrameResult: Sendable {
 }
 
 public extension URL {
+  /// Extracts unique video frames (as JPEG Data) using async/await.
+  /// Duplicate frames (based on SHA256 hash) are filtered out.
   func extractFramesFromVideo() async -> [VideoFrameResult] {
     var framesData = [VideoFrameResult]()
     var seenHashes = Set<String>()
 
-    let videoURL = self
-    // Start security-scoped access.
-    guard videoURL.startAccessingSecurityScopedResource() else {
-      print("Could not access security scoped resource for video URL")
-      return []
-    }
-    defer { videoURL.stopAccessingSecurityScopedResource() }
+    print("File Location: \(self.path)")
+    print(
+      "Does file exist: \(FileManager.default.fileExists(atPath: self.path))"
+    )
 
-    let asset = AVAsset(url: videoURL)
+    let videoURL = self
+
+    let asset = AVURLAsset(url: videoURL)
+    let status = asset.status(of: .tracks)
+    print("Asset Loading Status: \(status)")
 
     do {
+      let vidTracks = try await asset.loadTracks(withMediaType: .video)
+      print("Extracted Video Tracks: \(vidTracks.count)")
       // Load video tracks using the new async API.
       let (videoTracks, _, _) = try await asset.load(
         .tracks,
@@ -102,79 +107,21 @@ public extension URL {
     return framesData
   }
 
-  /// Extracts unique video frames (as JPEG Data) using async/await.
-  /// Duplicate frames (based on SHA256 hash) are filtered out.
-  func extractUniqueFramesFromVideo() async -> [VideoFrameResult] {
-    var framesData = [VideoFrameResult]()
-    var seenHashes = Set<String>()
+  static let videoFolderName: String = "ecosort_prediction_videos"
 
-    let videoURL = self
-    // Try to start security-scoped access.
-    guard videoURL.startAccessingSecurityScopedResource() else {
-      print("Could not access security scoped resource for video URL")
-      return []
-    }
-    defer { videoURL.stopAccessingSecurityScopedResource() }
-
-    let asset = AVAsset(url: videoURL)
-
-    do {
-      // Asynchronously load video tracks.
-      let videoTracks = try await asset.loadTracks(withMediaType: .video)
-      guard let videoTrack = videoTracks.first else {
-        return []
+  func saveVideoToAppDocument(_ isDocumentPicker: Bool) throws -> URL {
+    if isDocumentPicker {
+      guard self.startAccessingSecurityScopedResource() else {
+        throw NSError(
+          domain: "com.swapkoin.ecosort",
+          code: 1,
+          userInfo: [NSLocalizedDescriptionKey: "Unable to access security-scoped resource"]
+        )
       }
-
-      let reader = try AVAssetReader(asset: asset)
-      let outputSettings: [String: Any] = [
-        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
-      ]
-      let trackOutput = AVAssetReaderTrackOutput(track: videoTrack, outputSettings: outputSettings)
-
-      if reader.canAdd(trackOutput) {
-        reader.add(trackOutput)
-      }
-
-      reader.startReading()
-
-      // Create a CIContext once.
-      let context = CIContext()
-
-      while let sampleBuffer = trackOutput.copyNextSampleBuffer(),
-            let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
-        let ciImage = CIImage(cvPixelBuffer: imageBuffer)
-        if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
-          let uiImage = UIImage(cgImage: cgImage)
-          if let imageData = uiImage.jpegData(compressionQuality: 0.8), let resized = uiImage.preprocessImage(CGSize(width: 256, height: 256)) {
-            // Compute SHA256 hash of the frame's data.
-            let hash = SHA256.hash(data: imageData)
-            let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
-            // Only add the frame if its hash hasn't been seen.
-            if !seenHashes.contains(hashString) {
-              framesData
-                .append(
-                  VideoFrameResult(
-                    data: imageData,
-                    resizedData: resized,
-                    image: uiImage
-                  )
-                )
-              seenHashes.insert(hashString)
-            }
-          }
-        }
-      }
-    } catch {
-      print("Error extracting frames: \(error)")
-      return []
     }
 
-    return framesData
-  }
+    defer { self.stopAccessingSecurityScopedResource() }
 
-  static let videoFolderName: String = "ecosort_user_videos"
-
-  func saveVideoToAppDocument() throws -> URL {
     let path = try FileManager
       .default
       .url(
@@ -183,18 +130,21 @@ public extension URL {
         appropriateFor: nil,
         create: true
       )
-      .appendingPathComponent("ecosort_user_videos", isDirectory: true)
+      .appendingPathComponent(URL.videoFolderName, isDirectory: true)
 
-    if FileManager.default.fileExists(atPath: path.path) {
-      try FileManager.default.removeItem(at: path)
+    try FileManager.default
+      .createDirectory(at: path, withIntermediateDirectories: true)
+
+    let destinationUrl = path.appendingPathComponent(self.lastPathComponent)
+    if FileManager.default.fileExists(atPath: destinationUrl.path) {
+      try FileManager.default.removeItem(at: destinationUrl)
     }
 
     print("Current file path: \(self)")
-    try FileManager.default.copyItem(at: self, to: path)
-
-    let destinationUrl = path.appendingPathComponent(self.lastPathComponent)
+    try FileManager.default.copyItem(atPath: self.path, toPath: destinationUrl.path)
 
     print("New File Path: \(destinationUrl)")
+    print("Checking File Exist: ", FileManager.default.fileExists(atPath: destinationUrl.path))
     return destinationUrl
   }
 }

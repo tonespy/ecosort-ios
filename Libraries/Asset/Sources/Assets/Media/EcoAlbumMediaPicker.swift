@@ -121,13 +121,16 @@ public struct EcoAlbumMediaPicker: UIViewControllerRepresentable {
       let videoUTI = UTType.movie.identifier  // UTI for movie files.
 
       if provider.hasItemConformingToTypeIdentifier(videoUTI) {
-        provider.loadFileRepresentation(forTypeIdentifier: videoUTI) { url, error in
+        provider.loadFileRepresentation(forTypeIdentifier: videoUTI) {
+ url,
+ error in
           if let url = url {
             do {
-              let moveItem = try url.saveVideoToAppDocument()
+              let moveItem = try url.saveVideoToAppDocument(false)
               Task.detached {
                 await MainActor.run {
-                  self.parent.result = .processing("Extracting frames from video...")
+                  self.parent.result = 
+                    .processing("Extracting frames from video...")
                 }
                 let extractedFrames = await moveItem.extractFramesFromVideo()
 
