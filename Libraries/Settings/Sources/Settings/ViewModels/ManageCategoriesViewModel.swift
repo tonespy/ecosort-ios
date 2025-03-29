@@ -265,7 +265,6 @@ public final class ManageCategoriesViewModel: ObservableObject {
 
   private func deleteCurrentSelectedItem() {
     guard let currentSelectedItem, var userPreference = UserDefaults.standard.userPreference, !currentSelectedItem.isDefault else {
-      // Show error that you can't delete an only group
       return
     }
 

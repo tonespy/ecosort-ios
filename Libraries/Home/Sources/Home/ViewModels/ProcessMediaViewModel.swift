@@ -54,7 +54,7 @@ final class ProcessMediaViewModel: ObservableObject {
   @Published var processingMessage: String?
   @Published var errorMesaage: String? = nil
   @Published var groupConfigMessage: String? = nil
-  @Published var buttonTitle: String = ""
+  @Published var buttonTitle: String = "Start prediction"
   @Published var buttonDisabled: Bool = true
   var onComplete: ((String) -> Void)? = nil
 
@@ -123,6 +123,7 @@ final class ProcessMediaViewModel: ObservableObject {
       .store(in: &cancellables)
 
     $currentFlowState
+      .dropFirst()
       .sink { [weak self] current in
         guard let self = self else { return }
         switch current {
@@ -143,10 +144,12 @@ final class ProcessMediaViewModel: ObservableObject {
       }
       .store(in: &cancellables)
 
-    $buttonTitle.sink { current in
-      print("Current Text: ", current)
-    }
-    .store(in: &cancellables)
+    $buttonTitle
+      .dropFirst()
+      .sink { current in
+        print("Current Text: ", current)
+      }
+      .store(in: &cancellables)
   }
 
   private func fetch() {
@@ -270,6 +273,7 @@ final class ProcessMediaViewModel: ObservableObject {
 
   private func processCloudAIImagePredictions() {
     let images = allImageDict
+    changeButtonState("Predicting...", disabled: true)
     Task {
       do {
         self.predictionService.progressHandler = { progress in
@@ -298,6 +302,8 @@ final class ProcessMediaViewModel: ObservableObject {
       forceCompletePrediction()
       return
     }
+
+    changeButtonState("Predicting...", disabled: true)
     socketHelper.connectWebSocket()
     var allPredictions = [WSPrediction]()
     socketHelper.predictionResult = { [weak self] result in

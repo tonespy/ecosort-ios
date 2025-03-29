@@ -29,7 +29,6 @@ struct ProcessMediaView: View {
   var body: some View {
     NavigationView {
       VStack {
-        Text(viewModel.buttonTitle)
         List {
           // Images preview
           HStack(spacing: SpacingSize.xSmall.value) {
